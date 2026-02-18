@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge AI — Analyze Resume</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--amber:#f59e0b;--teal:#14b8a6}
+    body{font-family:'DM Sans',sans-serif;background:#080c18;color:#e8eaf0;min-height:100vh;}
+    .syne{font-family:'Syne',sans-serif;}
+    .sidebar{width:260px;min-height:100vh;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.07);position:fixed;left:0;top:0;bottom:0;display:flex;flex-direction:column;padding:28px 20px;z-index:50;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;color:rgba(255,255,255,0.45);font-size:0.88rem;font-weight:500;cursor:pointer;transition:all 0.2s;text-decoration:none;}
+    .nav-item:hover{background:rgba(255,255,255,0.06);color:#e8eaf0;}
+    .nav-item.active{background:rgba(245,158,11,0.12);color:#f59e0b;}
+    .main{margin-left:260px;padding:32px 36px;}
+    .glass{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:18px;}
+    .input-field{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:0.92rem;padding:13px 18px;outline:none;transition:all 0.3s;resize:vertical;}
+    .input-field::placeholder{color:rgba(255,255,255,0.2);}
+    .input-field:focus{border-color:#f59e0b;background:rgba(245,158,11,0.05);box-shadow:0 0 0 3px rgba(245,158,11,0.1);}
+    .btn-primary{background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:12px;color:#0a0e1a;font-family:'Syne',sans-serif;font-weight:700;font-size:0.95rem;padding:14px 28px;cursor:pointer;transition:all 0.3s;box-shadow:0 4px 20px rgba(245,158,11,0.3);}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,158,11,0.45);}
+    .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+    .tab-btn{padding:9px 16px;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:500;cursor:pointer;transition:all 0.25s;}
+    .tab-active{background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);}
+    .tab-inactive{background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.07);}
+    .pdf-zone{border:2px dashed rgba(255,255,255,0.12);border-radius:14px;padding:40px;text-align:center;cursor:pointer;transition:all 0.3s;}
+    .pdf-zone:hover,.pdf-zone.over{border-color:#f59e0b;background:rgba(245,158,11,0.05);}
+    .step-circle{width:32px;height:32px;border-radius:50%;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#f59e0b;font-family:'Syne',sans-serif;font-weight:800;font-size:0.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .spinner{width:52px;height:52px;border:3px solid rgba(255,255,255,0.08);border-top-color:#f59e0b;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .progress-dots{display:flex;gap:8px;justify-content:center;margin-top:16px;}
+    .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.15);animation:pulse 1.5s ease-in-out infinite;}
+    .dot:nth-child(2){animation-delay:0.2s;}
+    .dot:nth-child(3){animation-delay:0.4s;}
+    @keyframes pulse{0%,100%{background:rgba(255,255,255,0.15)}50%{background:#f59e0b}}
+    @media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:20px}}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="flex items-center gap-3 mb-10">
+    <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black">S</div>
+    <span class="text-white font-bold text-lg syne">Skill<span style="color:#f59e0b">Bridge</span></span>
+  </div>
+  <nav class="flex-1 space-y-1">
+    <a href="dashboard.html" class="nav-item"><span style="width:22px;text-align:center;">📊</span> Dashboard</a>
+    <a href="analyzer.html"  class="nav-item active"><span style="width:22px;text-align:center;">🧠</span> Analyze Resume</a>
+    <a href="history.html"   class="nav-item"><span style="width:22px;text-align:center;">📋</span> Scan History</a>
+  </nav>
+  <div class="mt-auto">
+    <button onclick="localStorage.clear();window.location.href='auth.html'" class="nav-item w-full text-left" style="color:#f87171;">
+      <span style="width:22px;text-align:center;">⬡</span> Sign Out
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-2xl font-black text-white syne">Resume Analyzer</h1>
+    <p class="text-white/40 text-sm mt-1">Get ATS score, mistake detection, JD match, career recommendations & more</p>
+  </div>
+
+  <!-- Analyzer Form -->
+  <div id="formSection">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- LEFT — inputs -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <!-- Step 1: Job Role -->
+        <div class="glass p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="step-circle">1</div>
+            <h3 class="font-bold text-white syne">Target Job Role</h3>
+          </div>
+          <input type="text" id="jobRole" class="input-field" placeholder="e.g. Data Analyst, Backend Engineer, Product Manager"/>
+        </div>
+
+        <!-- Step 2: Resume -->
+        <div class="glass p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="step-circle">2</div>
+            <h3 class="font-bold text-white syne">Your Resume</h3>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <button class="tab-btn tab-active" id="tabPaste" onclick="switchResTab('paste')">📋 Paste Text</button>
+            <button class="tab-btn tab-inactive" id="tabUpload" onclick="switchResTab('upload')">📄 Upload PDF</button>
+          </div>
+
+          <!-- Paste -->
+          <div id="panelPaste">
+            <textarea id="resumeText" class="input-field" rows="12" placeholder="Paste your full resume content here — experience, skills, education, projects..."></textarea>
+            <div class="flex justify-between mt-2">
+              <span class="text-xs text-white/25" id="charCount">0 characters</span>
+              <span class="text-xs text-white/25">Min 50 chars</span>
+            </div>
+          </div>
+
+          <!-- Upload PDF -->
+          <div id="panelUpload" hidden>
+            <div class="pdf-zone" id="pdfZone" onclick="document.getElementById('pdfInput').click()">
+              <input type="file" id="pdfInput" accept=".pdf" hidden onchange="handlePdf(this.files[0])"/>
+              <div id="dropPrompt">
+                <div class="text-4xl mb-3">📄</div>
+                <p class="text-white/60 font-medium">Drop PDF here or <span class="text-amber-400 underline">browse</span></p>
+                <p class="text-white/25 text-sm mt-1">PDF only · Max 5 MB</p>
+              </div>
+              <div id="dropSuccess" hidden>
+                <div class="text-3xl mb-2">✅</div>
+                <p class="text-green-400 font-medium" id="pdfName">File loaded</p>
+                <p class="text-white/40 text-sm" id="pdfChars"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: JD (Optional) -->
+        <div class="glass p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="step-circle" style="background:rgba(20,184,166,0.15);border-color:rgba(20,184,166,0.3);color:#14b8a6;">3</div>
+            <div>
+              <h3 class="font-bold text-white syne">Job Description <span class="text-white/30 font-normal text-sm syne">(Optional)</span></h3>
+              <p class="text-xs text-white/35 mt-0.5">Paste the JD for deeper keyword matching</p>
+            </div>
+          </div>
+          <textarea id="jobDesc" class="input-field" rows="5" placeholder="Paste the full job description here to get JD keyword match score..."></textarea>
+        </div>
+
+      </div>
+
+      <!-- RIGHT — features preview -->
+      <div class="space-y-4">
+        <div class="glass p-5">
+          <h3 class="font-bold text-white syne text-sm mb-4">What You'll Get</h3>
+          <div class="space-y-3">
+            <div class="flex items-start gap-3">
+              <div class="text-amber-400 text-lg">🎯</div>
+              <div>
+                <div class="text-sm font-semibold text-white">ATS Score</div>
+                <div class="text-xs text-white/40 mt-0.5">0–100 score with 5-dimension breakdown</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="text-red-400 text-lg">🔍</div>
+              <div>
+                <div class="text-sm font-semibold text-white">Mistake Detector</div>
+                <div class="text-xs text-white/40 mt-0.5">Critical errors, warnings & suggestions</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="text-teal-400 text-lg">📋</div>
+              <div>
+                <div class="text-sm font-semibold text-white">JD Keyword Match</div>
+                <div class="text-xs text-white/40 mt-0.5">Match % with missing keywords list</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="text-purple-400 text-lg">✨</div>
+              <div>
+                <div class="text-sm font-semibold text-white">Improvement Plan</div>
+                <div class="text-xs text-white/40 mt-0.5">Add / Remove / Rewrite suggestions</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="text-green-400 text-lg">💼</div>
+              <div>
+                <div class="text-sm font-semibold text-white">Career AI</div>
+                <div class="text-xs text-white/40 mt-0.5">Top job matches with where to apply</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="text-blue-400 text-lg">🎤</div>
+              <div>
+                <div class="text-sm font-semibold text-white">Interview Prep</div>
+                <div class="text-xs text-white/40 mt-0.5">Predicted questions with answering tips</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-primary w-full text-center" id="analyzeBtn" onclick="runAnalysis()">
+          🚀 Run Full Analysis
+        </button>
+
+        <div class="glass p-4 text-xs text-white/30 text-center leading-relaxed">
+          Results are saved to your account and accessible in Scan History
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingSection" class="text-center py-24" hidden>
+    <div class="spinner mb-6"></div>
+    <h2 class="text-xl font-black text-white syne mb-2" id="loadingMsg">Running AI Analysis…</h2>
+    <p class="text-white/40 text-sm" id="loadingSub">Analyzing across 6 intelligence dimensions</p>
+    <div class="progress-dots mt-4">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="mt-8 space-y-2 text-left max-w-xs mx-auto" id="loadingSteps">
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s1">⏳</span> Extracting resume structure</div>
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s2">⏳</span> Computing ATS score</div>
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s3">⏳</span> Detecting mistakes</div>
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s4">⏳</span> Matching job description</div>
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s5">⏳</span> Generating career recommendations</div>
+      <div class="text-xs text-white/30 flex items-center gap-2"><span id="s6">⏳</span> Preparing interview questions</div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="errorSection" hidden class="glass p-8 text-center mt-8">
+    <div class="text-4xl mb-3">⚠️</div>
+    <h3 class="font-bold text-white syne mb-2">Analysis Failed</h3>
+    <p class="text-white/50 text-sm" id="errorMsg"></p>
+    <button onclick="resetForm()" class="btn-primary mt-6">Try Again</button>
+  </div>
+
+</main>
+
+<script>
+  const API   = "http://localhost:5000/api";
+  const token = localStorage.getItem("sb_token");
+  if (!token) window.location.href = "auth.html";
+  const authHeaders = {"Authorization":`Bearer ${token}`, "Content-Type":"application/json"};
+
+  let resumeTab = "paste";
+  let pdfText   = "";
+
+  // Char counter
+  document.getElementById("resumeText").addEventListener("input", e => {
+    const l = e.target.value.length;
+    document.getElementById("charCount").textContent = `${l} character${l!==1?"s":""}`;
+  });
+
+  function switchResTab(tab) {
+    resumeTab = tab;
+    document.getElementById("panelPaste").hidden  = tab !== "paste";
+    document.getElementById("panelUpload").hidden = tab !== "upload";
+    document.getElementById("tabPaste").className  = `tab-btn ${tab==="paste"?"tab-active":"tab-inactive"}`;
+    document.getElementById("tabUpload").className = `tab-btn ${tab==="upload"?"tab-active":"tab-inactive"}`;
+  }
+
+  async function handlePdf(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    document.getElementById("dropPrompt").hidden  = true;
+    document.getElementById("dropSuccess").hidden = false;
+    document.getElementById("pdfName").textContent = "Extracting…";
+    try {
+      const res  = await fetch(`${API}/extract-pdf`, { method:"POST", headers:{"Authorization":`Bearer ${token}`}, body:fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      pdfText = data.text;
+      document.getElementById("pdfName").textContent   = `✅ ${file.name}`;
+      document.getElementById("pdfChars").textContent  = `${pdfText.length.toLocaleString()} chars · ${data.pages} pages`;
+    } catch(err) {
+      document.getElementById("dropPrompt").hidden  = false;
+      document.getElementById("dropSuccess").hidden = true;
+      alert("PDF error: " + err.message);
+    }
+  }
+
+  // Drag-and-drop
+  const zone = document.getElementById("pdfZone");
+  zone.addEventListener("dragover", e=>{e.preventDefault();zone.classList.add("over");});
+  zone.addEventListener("dragleave",()=>zone.classList.remove("over"));
+  zone.addEventListener("drop",e=>{e.preventDefault();zone.classList.remove("over");handlePdf(e.dataTransfer.files[0]);});
+
+  function animateSteps() {
+    const steps = ["s1","s2","s3","s4","s5","s6"];
+    steps.forEach((id, i) => {
+      setTimeout(() => {
+        if(i>0) document.getElementById(steps[i-1]).textContent = "✅";
+        document.getElementById(id).textContent = "🔄";
+      }, i * 2500);
+    });
+    setTimeout(()=>document.getElementById("s6").textContent="✅", 6*2500);
+  }
+
+  async function runAnalysis() {
+    const jobRole = document.getElementById("jobRole").value.trim();
+    const jd      = document.getElementById("jobDesc").value.trim();
+    let   resume  = resumeTab === "paste" ? document.getElementById("resumeText").value.trim() : pdfText;
+
+    if (!jobRole) { alert("Please enter a target job role."); return; }
+    if (!resume)  { alert(resumeTab==="paste"?"Please paste your resume.":"Please upload a PDF and wait for extraction."); return; }
+    if (resume.length < 50) { alert("Resume too short — min 50 characters."); return; }
+
+    // Show loading
+    document.getElementById("formSection").hidden    = true;
+    document.getElementById("loadingSection").hidden = false;
+    animateSteps();
+
+    try {
+      const res  = await fetch(`${API}/analyze`, {
+        method:"POST", headers:authHeaders,
+        body: JSON.stringify({ resume, job_role: jobRole, job_description: jd })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      // Redirect to result page
+      localStorage.setItem("sb_last_result", JSON.stringify(data));
+      window.location.href = `result.html?id=${data.scan_id}`;
+
+    } catch(err) {
+      document.getElementById("loadingSection").hidden = true;
+      document.getElementById("errorSection").hidden   = false;
+      document.getElementById("errorMsg").textContent  = err.message;
+    }
+  }
+
+  function resetForm() {
+    document.getElementById("formSection").hidden    = false;
+    document.getElementById("loadingSection").hidden = true;
+    document.getElementById("errorSection").hidden   = true;
+    const btn = document.getElementById("analyzeBtn");
+    btn.disabled = false;
+    btn.textContent = "🚀 Run Full Analysis";
+  }
+</script>
+</body>
+</html>

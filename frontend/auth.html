@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge AI — Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
+    :root {
+      --ink:    #0a0e1a;
+      --amber:  #f59e0b;
+      --teal:   #14b8a6;
+      --card:   rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #080c18;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    h1,h2,h3,.display { font-family: 'Syne', sans-serif; }
+
+    /* Animated mesh background */
+    .mesh {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(245,158,11,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 80%, rgba(20,184,166,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 60% 30%, rgba(99,102,241,0.08) 0%, transparent 50%);
+      animation: meshMove 12s ease-in-out infinite alternate;
+    }
+    @keyframes meshMove {
+      from { background-position: 0% 0%, 100% 100%, 60% 30%; }
+      to   { background-position: 10% 5%, 90% 95%, 65% 35%; }
+    }
+
+    /* Grid dots */
+    .grid-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .glass-card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 24px;
+    }
+
+    .input-field {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: #e8eaf0;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      padding: 13px 18px;
+      outline: none;
+      transition: all 0.3s;
+    }
+    .input-field::placeholder { color: rgba(255,255,255,0.25); }
+    .input-field:focus {
+      border-color: #f59e0b;
+      background: rgba(245,158,11,0.06);
+      box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      border-radius: 12px;
+      color: #0a0e1a;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+      letter-spacing: 0.03em;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(245,158,11,0.45);
+      filter: brightness(1.08);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .tab-active {
+      color: #f59e0b;
+      border-bottom: 2px solid #f59e0b;
+    }
+    .tab-inactive {
+      color: rgba(255,255,255,0.35);
+      border-bottom: 2px solid transparent;
+    }
+
+    .error-box {
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 0.85rem;
+      padding: 10px 14px;
+    }
+
+    .feature-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.55);
+    }
+    .feature-pill span.dot { width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block; }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(20px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.6s ease both; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="mesh"></div>
+  <div class="grid-bg"></div>
+
+  <div class="relative z-10 min-h-screen flex">
+
+    <!-- LEFT — Branding Panel -->
+    <div class="hidden lg:flex flex-col justify-between w-1/2 p-16">
+      <div>
+        <!-- Logo -->
+        <div class="flex items-center gap-3 fade-up">
+          <div class="w-10 h-10 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black text-lg">S</div>
+          <span class="text-white font-bold text-xl" style="font-family:'Syne',sans-serif;">SkillBridge <span style="color:#f59e0b;">AI</span></span>
+        </div>
+
+        <!-- Headline -->
+        <div class="mt-20 fade-up delay-1">
+          <h1 class="text-5xl font-black text-white leading-tight" style="font-family:'Syne',sans-serif;">
+            Intelligent<br/>
+            <span style="background:linear-gradient(135deg,#f59e0b,#14b8a6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+              Career<br/>Intelligence
+            </span>
+          </h1>
+          <p class="mt-6 text-lg text-white/50 leading-relaxed max-w-sm">
+            The only platform that reads your resume like an ATS, thinks like a recruiter, and coaches like a mentor.
+          </p>
+        </div>
+
+        <!-- Feature pills -->
+        <div class="mt-10 flex flex-wrap gap-3 fade-up delay-2">
+          <div class="feature-pill"><span class="dot"></span> ATS Score Engine</div>
+          <div class="feature-pill"><span class="dot" style="background:#14b8a6"></span> Mistake Detector</div>
+          <div class="feature-pill"><span class="dot" style="background:#818cf8"></span> JD Matcher</div>
+          <div class="feature-pill"><span class="dot" style="background:#f59e0b"></span> Career AI</div>
+          <div class="feature-pill"><span class="dot" style="background:#34d399"></span> Dashboard Analytics</div>
+          <div class="feature-pill"><span class="dot" style="background:#f472b6"></span> Interview Prep</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-3 gap-6 fade-up delay-3">
+        <div>
+          <div class="text-3xl font-black text-white" style="font-family:'Syne',sans-serif;">6+</div>
+          <div class="text-sm text-white/40 mt-1">AI Features</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black" style="font-family:'Syne',sans-serif;color:#f59e0b;">ATS</div>
+          <div class="text-sm text-white/40 mt-1">Optimized</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black text-white" style="font-family:'Syne',sans-serif;">∞</div>
+          <div class="text-sm text-white/40 mt-1">Scans</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT — Auth Form -->
+    <div class="flex-1 flex items-center justify-center p-6 lg:p-16">
+      <div class="w-full max-w-md">
+
+        <!-- Mobile logo -->
+        <div class="flex lg:hidden items-center gap-3 mb-10 justify-center">
+          <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black">S</div>
+          <span class="text-white font-bold text-xl" style="font-family:'Syne',sans-serif;">SkillBridge <span style="color:#f59e0b;">AI</span></span>
+        </div>
+
+        <div class="glass-card p-8 fade-up">
+
+          <!-- Tabs -->
+          <div class="flex border-b border-white/10 mb-8">
+            <button class="flex-1 pb-3 text-sm font-semibold transition-all tab-active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+            <button class="flex-1 pb-3 text-sm font-semibold transition-all tab-inactive" id="tabRegister" onclick="switchTab('register')">Create Account</button>
+          </div>
+
+          <!-- Error -->
+          <div class="error-box mb-5" id="authError" hidden></div>
+
+          <!-- LOGIN FORM -->
+          <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-widest">Email</label>
+                <input type="email" id="loginEmail" class="input-field" placeholder="you@example.com" required/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-widest">Password</label>
+                <input type="password" id="loginPassword" class="input-field" placeholder="••••••••" required/>
+              </div>
+              <div class="pt-2">
+                <button type="submit" class="btn-primary" id="loginBtn">
+                  Sign In →
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <!-- REGISTER FORM -->
+          <form id="registerForm" onsubmit="handleRegister(event)" hidden>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-widest">Full Name</label>
+                <input type="text" id="regName" class="input-field" placeholder="Jane Smith" required/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-widest">Email</label>
+                <input type="email" id="regEmail" class="input-field" placeholder="you@example.com" required/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-widest">Password</label>
+                <input type="password" id="regPassword" class="input-field" placeholder="Min 6 characters" required/>
+              </div>
+              <div class="pt-2">
+                <button type="submit" class="btn-primary" id="registerBtn">
+                  Create Account →
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <p class="text-center text-white/30 text-xs mt-6">
+            By continuing, you agree to our Terms of Service
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = "http://localhost:5000/api";
+
+    function switchTab(tab) {
+      const isLogin = tab === "login";
+      document.getElementById("loginForm").hidden    = !isLogin;
+      document.getElementById("registerForm").hidden = isLogin;
+      document.getElementById("tabLogin").className    = `flex-1 pb-3 text-sm font-semibold transition-all ${isLogin ? "tab-active" : "tab-inactive"}`;
+      document.getElementById("tabRegister").className = `flex-1 pb-3 text-sm font-semibold transition-all ${!isLogin ? "tab-active" : "tab-inactive"}`;
+      hideError();
+    }
+
+    function showError(msg) {
+      const el = document.getElementById("authError");
+      el.textContent = msg;
+      el.hidden = false;
+    }
+    function hideError() { document.getElementById("authError").hidden = true; }
+
+    function saveAuth(data) {
+      localStorage.setItem("sb_token", data.token);
+      localStorage.setItem("sb_name",  data.name);
+      localStorage.setItem("sb_email", data.email);
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault(); hideError();
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true; btn.textContent = "Signing in…";
+      try {
+        const res  = await fetch(`${API}/auth/login`, {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            email:    document.getElementById("loginEmail").value,
+            password: document.getElementById("loginPassword").value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        saveAuth(data);
+        window.location.href = "dashboard.html";
+      } catch(err) {
+        showError(err.message);
+        btn.disabled = false; btn.textContent = "Sign In →";
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault(); hideError();
+      const btn = document.getElementById("registerBtn");
+      btn.disabled = true; btn.textContent = "Creating account…";
+      try {
+        const res  = await fetch(`${API}/auth/register`, {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            name:     document.getElementById("regName").value,
+            email:    document.getElementById("regEmail").value,
+            password: document.getElementById("regPassword").value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        saveAuth(data);
+        window.location.href = "dashboard.html";
+      } catch(err) {
+        showError(err.message);
+        btn.disabled = false; btn.textContent = "Create Account →";
+      }
+    }
+
+    // Redirect if already logged in
+    if (localStorage.getItem("sb_token")) {
+      window.location.href = "dashboard.html";
+    }
+  </script>
+</body>
+</html>

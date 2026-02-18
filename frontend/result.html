@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge AI — Analysis Results</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--amber:#f59e0b;--teal:#14b8a6}
+    body{font-family:'DM Sans',sans-serif;background:#080c18;color:#e8eaf0;min-height:100vh;}
+    .syne{font-family:'Syne',sans-serif;}
+    .sidebar{width:260px;min-height:100vh;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.07);position:fixed;left:0;top:0;bottom:0;display:flex;flex-direction:column;padding:28px 20px;z-index:50;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;color:rgba(255,255,255,0.45);font-size:0.88rem;font-weight:500;cursor:pointer;transition:all 0.2s;text-decoration:none;}
+    .nav-item:hover{background:rgba(255,255,255,0.06);color:#e8eaf0;}
+    .nav-item.active{background:rgba(245,158,11,0.12);color:#f59e0b;}
+    .main{margin-left:260px;padding:32px 36px;}
+    .glass{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:18px;}
+    .glass:hover{border-color:rgba(245,158,11,0.2);}
+
+    /* Result Nav */
+    .rnav{display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:5px;flex-wrap:wrap;}
+    .rnav-btn{flex:1;min-width:90px;padding:9px 12px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;cursor:pointer;transition:all 0.25s;white-space:nowrap;text-align:center;}
+    .rnav-active{background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);}
+    .rnav-inactive{background:transparent;color:rgba(255,255,255,0.4);}
+
+    /* Score ring */
+    .big-ring-wrap{position:relative;width:160px;height:160px;flex-shrink:0;}
+    .big-ring{width:160px;height:160px;transform:rotate(-90deg);}
+    .ring-bg{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:10;}
+    .ring-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1);}
+    .ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+
+    /* Breakdown bars */
+    .bar-track{height:8px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+    .bar-fill{height:100%;border-radius:100px;transition:width 1.3s cubic-bezier(.4,0,.2,1);}
+
+    /* Mistake cards */
+    .mistake-card{padding:14px 18px;border-radius:12px;border-left:3px solid;}
+    .mistake-critical{background:rgba(239,68,68,0.08);border-color:#ef4444;}
+    .mistake-warning{background:rgba(245,158,11,0.08);border-color:#f59e0b;}
+    .mistake-suggestion{background:rgba(79,195,247,0.08);border-color:#4fc3f7;}
+
+    /* Badges */
+    .badge{display:inline-block;padding:4px 12px;border-radius:100px;font-size:0.75rem;font-weight:600;}
+    .badge-green{background:rgba(52,211,153,0.15);color:#34d399;}
+    .badge-red{background:rgba(239,68,68,0.15);color:#f87171;}
+    .badge-amber{background:rgba(245,158,11,0.15);color:#f59e0b;}
+    .badge-blue{background:rgba(79,195,247,0.15);color:#4fc3f7;}
+    .badge-purple{background:rgba(167,139,250,0.15);color:#a78bfa;}
+
+    /* Job cards */
+    .job-card{display:flex;gap:16px;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.03);transition:all 0.2s;}
+    .job-card:hover{border-color:rgba(245,158,11,0.25);background:rgba(255,255,255,0.05);transform:translateX(3px);}
+
+    /* Q accordion */
+    .q-item{border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;transition:border-color 0.2s;}
+    .q-item:hover{border-color:rgba(245,158,11,0.2);}
+    .q-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;background:rgba(255,255,255,0.02);}
+    .q-body{display:none;padding:12px 18px;background:rgba(245,158,11,0.04);border-top:1px solid rgba(255,255,255,0.07);}
+    .q-item.open .q-body{display:block;}
+    .q-item.open .q-arrow{transform:rotate(180deg);}
+    .q-arrow{transition:transform 0.2s;color:rgba(255,255,255,0.3);font-size:0.75rem;}
+
+    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .fu{animation:fadeUp 0.4s ease both;}
+    @media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:16px}}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="flex items-center gap-3 mb-10">
+    <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black">S</div>
+    <span class="text-white font-bold text-lg syne">Skill<span style="color:#f59e0b">Bridge</span></span>
+  </div>
+  <nav class="flex-1 space-y-1">
+    <a href="dashboard.html" class="nav-item"><span style="width:22px;text-align:center">📊</span> Dashboard</a>
+    <a href="analyzer.html"  class="nav-item"><span style="width:22px;text-align:center">🧠</span> Analyze Resume</a>
+    <a href="history.html"   class="nav-item active"><span style="width:22px;text-align:center">📋</span> Scan History</a>
+  </nav>
+  <div class="mt-auto">
+    <button onclick="localStorage.clear();window.location.href='auth.html'" class="nav-item w-full text-left" style="color:#f87171;">
+      <span style="width:22px;text-align:center">⬡</span> Sign Out
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6 fu">
+    <div>
+      <a href="history.html" class="text-white/30 text-sm hover:text-white/60">← Back to History</a>
+      <h1 class="text-2xl font-black text-white syne mt-1" id="pageTitle">Analysis Results</h1>
+    </div>
+    <a href="analyzer.html" class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl transition-all">+ New Scan</a>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingState" class="text-center py-20">
+    <div class="w-10 h-10 border-2 border-white/10 border-t-amber-400 rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-white/40">Loading results…</p>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsContent" hidden>
+
+    <!-- Verdict Banner -->
+    <div class="glass p-5 mb-5 fu flex items-center gap-4">
+      <div class="text-3xl">💡</div>
+      <p class="text-white/70 text-sm leading-relaxed flex-1" id="verdict"></p>
+    </div>
+
+    <!-- Results Nav -->
+    <div class="rnav mb-5 fu">
+      <button class="rnav-btn rnav-active" onclick="showPanel('panelATS')">🎯 ATS Score</button>
+      <button class="rnav-btn rnav-inactive" onclick="showPanel('panelMistakes')">🔍 Mistakes</button>
+      <button class="rnav-btn rnav-inactive" onclick="showPanel('panelImprove')">✨ Improve</button>
+      <button class="rnav-btn rnav-inactive" onclick="showPanel('panelJD')">📋 JD Match</button>
+      <button class="rnav-btn rnav-inactive" onclick="showPanel('panelCareers')">💼 Careers</button>
+      <button class="rnav-btn rnav-inactive" onclick="showPanel('panelInterview')">🎤 Interview</button>
+    </div>
+
+    <!-- ── ATS PANEL ── -->
+    <div id="panelATS">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- Big score -->
+        <div class="glass p-8 flex items-center gap-8 fu">
+          <div class="big-ring-wrap">
+            <svg class="big-ring" viewBox="0 0 160 160">
+              <circle class="ring-bg" cx="80" cy="80" r="66"/>
+              <circle class="ring-fill" id="atsRing" cx="80" cy="80" r="66" stroke="#f59e0b"
+                stroke-dasharray="415" stroke-dashoffset="415"/>
+            </svg>
+            <div class="ring-num">
+              <span id="atsVal" class="text-4xl font-black syne" style="color:#f59e0b">0</span>
+              <span class="text-white/40 text-sm">/100</span>
+            </div>
+          </div>
+          <div class="flex-1">
+            <div class="text-xs text-white/40 uppercase tracking-widest mb-1">ATS Score</div>
+            <div class="text-2xl font-black syne text-white" id="atsGrade">—</div>
+            <p class="text-white/50 text-sm mt-2" id="atsDesc">—</p>
+            <div class="mt-4 flex flex-wrap gap-2" id="skillBadges"></div>
+          </div>
+        </div>
+
+        <!-- Breakdown -->
+        <div class="glass p-6 fu">
+          <div class="text-xs text-white/40 uppercase tracking-widest mb-5">Score Breakdown</div>
+          <div id="breakdownList" class="space-y-4"></div>
+        </div>
+
+      </div>
+
+      <!-- Strengths -->
+      <div class="glass p-6 mt-5 fu">
+        <div class="text-xs text-white/40 uppercase tracking-widest mb-4">Resume Strengths</div>
+        <div id="strengthsList" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+      </div>
+    </div>
+
+    <!-- ── MISTAKES PANEL ── -->
+    <div id="panelMistakes" hidden>
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="font-bold text-white syne">Detected Issues</h3>
+          <div class="flex gap-2" id="mistakeLegend"></div>
+        </div>
+        <div id="mistakesList" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- ── IMPROVE PANEL ── -->
+    <div id="panelImprove" hidden>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="glass p-6">
+          <div class="text-xs text-green-400/60 uppercase tracking-widest mb-4">➕ Add These</div>
+          <ul id="addList" class="space-y-2"></ul>
+        </div>
+        <div class="glass p-6">
+          <div class="text-xs text-red-400/60 uppercase tracking-widest mb-4">✕ Remove These</div>
+          <ul id="removeList" class="space-y-2"></ul>
+        </div>
+      </div>
+      <div class="glass p-6 mt-5">
+        <div class="text-xs text-amber-400/60 uppercase tracking-widest mb-4">✎ Rewrite These</div>
+        <ul id="rewriteList" class="space-y-3"></ul>
+      </div>
+    </div>
+
+    <!-- ── JD MATCH PANEL ── -->
+    <div id="panelJD" hidden>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        <div class="glass p-6 flex flex-col items-center justify-center text-center">
+          <div class="text-5xl font-black syne" id="jdPct" style="color:#14b8a6">—</div>
+          <div class="text-white/40 text-sm mt-1">JD Match Score</div>
+          <div class="mt-4 text-sm text-white/60 leading-relaxed" id="jdGap"></div>
+        </div>
+
+        <div class="glass p-6">
+          <div class="text-xs text-green-400/60 uppercase tracking-widest mb-4">✓ Matched Keywords</div>
+          <div id="matchedKw" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div class="glass p-6">
+          <div class="text-xs text-red-400/60 uppercase tracking-widest mb-4">✕ Missing Keywords</div>
+          <div id="missingKw" class="flex flex-wrap gap-2"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── CAREERS PANEL ── -->
+    <div id="panelCareers" hidden>
+      <div class="glass p-6">
+        <h3 class="font-bold text-white syne mb-5">AI Career Recommendations</h3>
+        <div id="careersList" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- ── INTERVIEW PANEL ── -->
+    <div id="panelInterview" hidden>
+      <div class="glass p-6">
+        <h3 class="font-bold text-white syne mb-2">Predicted Interview Questions</h3>
+        <p class="text-white/40 text-sm mb-5">Tap each question to reveal an answering tip.</p>
+        <div id="questionsList" class="space-y-3"></div>
+      </div>
+    </div>
+
+  </div><!-- /resultsContent -->
+
+</main>
+
+<script>
+  const API   = "http://localhost:5000/api";
+  const token = localStorage.getItem("sb_token");
+  if (!token) window.location.href = "auth.html";
+  const authHeaders = {"Authorization":`Bearer ${token}`};
+
+  const panels = ["panelATS","panelMistakes","panelImprove","panelJD","panelCareers","panelInterview"];
+
+  function showPanel(id) {
+    panels.forEach(p => document.getElementById(p).hidden = p !== id);
+    document.querySelectorAll(".rnav-btn").forEach((b,i) => {
+      b.className = `rnav-btn ${panels[i]===id ? "rnav-active":"rnav-inactive"}`;
+    });
+  }
+
+  function atsColor(s){if(s>=75)return"#34d399";if(s>=50)return"#f59e0b";return"#f87171";}
+  function atsGrade(s){
+    if(s>=90)return{g:"A+ Exceptional",d:"Outstanding — recruiter-ready resume."};
+    if(s>=80)return{g:"A Strong",d:"Well optimized with great keyword density."};
+    if(s>=70)return{g:"B+ Good",d:"Solid resume with minor gaps to address."};
+    if(s>=60)return{g:"B Decent",d:"Decent but needs stronger metrics."};
+    if(s>=50)return{g:"C+ Average",d:"Average — improvements will boost response rates."};
+    return{g:"Below Average",d:"Significant work needed to pass ATS filters."};
+  }
+  function counter(el, target, dur=1200){
+    const s=performance.now();
+    const tick=now=>{
+      const t=Math.min((now-s)/dur,1);
+      el.textContent=Math.round((1-Math.pow(1-t,3))*target);
+      if(t<1)requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  function renderATS(d) {
+    const score = d.ats_score || 0;
+    const color = atsColor(score);
+    const grade = atsGrade(score);
+
+    counter(document.getElementById("atsVal"), score);
+    const ring = document.getElementById("atsRing");
+    ring.style.stroke = color;
+    setTimeout(()=>{ ring.style.strokeDashoffset = 415 - (score/100)*415; },100);
+
+    document.getElementById("atsGrade").textContent = grade.g;
+    document.getElementById("atsGrade").style.color = color;
+    document.getElementById("atsDesc").textContent  = grade.d;
+
+    // Existing skills as badges
+    const sb = document.getElementById("skillBadges");
+    (d.existing_skills||[]).slice(0,6).forEach(s=>{
+      const b=document.createElement("span");
+      b.className="badge badge-green text-xs";b.textContent=s;sb.appendChild(b);
+    });
+
+    // Breakdown
+    const bd = d.ats_breakdown || {};
+    const labels={keyword_match:"Keyword Match",format_compatibility:"Format Compat.",section_completeness:"Section Complete.",quantified_impact:"Impact Metrics",readability:"Readability"};
+    const bl = document.getElementById("breakdownList");
+    Object.entries(labels).forEach(([k,label])=>{
+      const v=bd[k]||0;
+      const c=atsColor(v);
+      const row=document.createElement("div");
+      row.innerHTML=`
+        <div class="flex justify-between text-xs mb-1.5">
+          <span class="text-white/50">${label}</span>
+          <span style="color:${c};font-family:'Syne',sans-serif;font-weight:700;">${v}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:0%;background:${c}" data-w="${v}"></div></div>`;
+      bl.appendChild(row);
+    });
+    setTimeout(()=>{
+      bl.querySelectorAll(".bar-fill").forEach(b=>{ b.style.width=b.dataset.w+"%"; });
+    },200);
+
+    // Strengths
+    const sl=document.getElementById("strengthsList");
+    (d.strengths||[]).forEach(s=>{
+      const div=document.createElement("div");
+      div.className="flex items-start gap-2 p-3 rounded-xl bg-green-500/5 border border-green-500/10";
+      div.innerHTML=`<span class="text-green-400 mt-0.5">✓</span><span class="text-sm text-white/70">${s}</span>`;
+      sl.appendChild(div);
+    });
+  }
+
+  function renderMistakes(d) {
+    const list=document.getElementById("mistakesList");
+    const mistakes=d.resume_mistakes||[];
+    const counts={critical:0,warning:0,suggestion:0};
+    mistakes.forEach(m=>{counts[m.type]=(counts[m.type]||0)+1;});
+
+    const leg=document.getElementById("mistakeLegend");
+    const lc={critical:"text-red-400",warning:"text-amber-400",suggestion:"text-blue-400"};
+    Object.entries(counts).forEach(([t,c])=>{
+      if(c>0){
+        const s=document.createElement("span");
+        s.className=`text-xs ${lc[t]}`;
+        s.textContent=`${c} ${t}`;
+        leg.appendChild(s);
+      }
+    });
+
+    if(!mistakes.length){list.innerHTML='<p class="text-white/30 text-sm text-center py-6">No issues detected — great resume!</p>';return;}
+    const cls={critical:"mistake-critical",warning:"mistake-warning",suggestion:"mistake-suggestion"};
+    const ico={critical:"🚨",warning:"⚠️",suggestion:"💡"};
+    mistakes.forEach(m=>{
+      const div=document.createElement("div");
+      div.className=`mistake-card ${cls[m.type]||"mistake-suggestion"}`;
+      div.innerHTML=`
+        <div class="flex items-start gap-3">
+          <span>${ico[m.type]||"💡"}</span>
+          <div>
+            <div class="font-semibold text-white text-sm">${m.issue}</div>
+            <div class="text-white/50 text-xs mt-1">Fix: ${m.fix}</div>
+          </div>
+        </div>`;
+      list.appendChild(div);
+    });
+  }
+
+  function renderImprove(d) {
+    const imp=d.improvement_suggestions||{};
+    const al=document.getElementById("addList");
+    const rl=document.getElementById("removeList");
+    const rwl=document.getElementById("rewriteList");
+    (imp.add_these||[]).forEach(i=>{
+      const li=document.createElement("li");
+      li.className="flex items-start gap-2 text-sm text-white/70";
+      li.innerHTML=`<span class="text-green-400 mt-0.5 text-xs">◆</span>${i}`;
+      al.appendChild(li);
+    });
+    (imp.remove_these||[]).forEach(i=>{
+      const li=document.createElement("li");
+      li.className="flex items-start gap-2 text-sm text-white/70";
+      li.innerHTML=`<span class="text-red-400 mt-0.5 text-xs">✕</span>${i}`;
+      rl.appendChild(li);
+    });
+    (imp.rewrite_these||[]).forEach(i=>{
+      const li=document.createElement("li");
+      li.className="flex items-start gap-2 text-sm text-white/70 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10";
+      li.innerHTML=`<span class="text-amber-400 mt-0.5 text-xs flex-shrink-0">✎</span>${i}`;
+      rwl.appendChild(li);
+    });
+  }
+
+  function renderJD(d) {
+    const jd=d.jd_match||{};
+    const pct=jd.match_percentage||0;
+    const c=atsColor(pct);
+    document.getElementById("jdPct").textContent=pct+"%";
+    document.getElementById("jdPct").style.color=c;
+    document.getElementById("jdGap").textContent=jd.gap_summary||"Paste a job description to see detailed keyword matching.";
+    const mk=document.getElementById("matchedKw");
+    (jd.matched_keywords||[]).forEach(k=>{const s=document.createElement("span");s.className="badge badge-green text-xs";s.textContent=k;mk.appendChild(s);});
+    const mik=document.getElementById("missingKw");
+    (jd.missing_keywords||[]).forEach(k=>{const s=document.createElement("span");s.className="badge badge-red text-xs";s.textContent=k;mik.appendChild(s);});
+    if(!jd.match_percentage) document.getElementById("jdPct").textContent="N/A";
+  }
+
+  function renderCareers(d) {
+    const cl=document.getElementById("careersList");
+    const mc={High:"badge-green",Medium:"badge-amber",Low:"badge-red"};
+    (d.career_recommendations||[]).forEach(c=>{
+      const div=document.createElement("div");
+      div.className="job-card";
+      div.innerHTML=`
+        <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-xl">💼</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="font-bold text-white syne">${c.title}</span>
+            <span class="badge ${mc[c.match_level]||"badge-amber"} text-xs">${c.match_level} Match · ${c.match}%</span>
+          </div>
+          <p class="text-white/50 text-xs mt-1">${c.reason}</p>
+          <p class="text-teal-400/70 text-xs mt-1">📈 ${c.growth}</p>
+          <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span class="text-white/25 text-xs">Find at:</span>
+            ${(c.find_at||[]).map(p=>`<span class="px-2 py-0.5 bg-white/5 border border-white/08 rounded text-xs text-white/40">${p}</span>`).join("")}
+          </div>
+          <p class="text-white/25 text-xs mt-1 italic">Search: "${c.search}"</p>
+        </div>`;
+      cl.appendChild(div);
+    });
+  }
+
+  function renderInterview(d) {
+    const ql=document.getElementById("questionsList");
+    const catColors={Technical:"badge-blue",Behavioral:"badge-green",Situational:"badge-amber","Culture Fit":"badge-purple"};
+    (d.interview_questions||[]).forEach(q=>{
+      const div=document.createElement("div");
+      div.className="q-item";
+      div.innerHTML=`
+        <div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="badge ${catColors[q.category]||"badge-blue"} text-xs flex-shrink-0">${q.category}</span>
+          <span class="flex-1 text-sm text-white font-medium">${q.question}</span>
+          <span class="q-arrow">▼</span>
+        </div>
+        <div class="q-body">
+          <span class="text-xs text-amber-400/60 uppercase tracking-wider block mb-1">💡 Tip</span>
+          <p class="text-sm text-white/60 leading-relaxed">${q.tip}</p>
+        </div>`;
+      ql.appendChild(div);
+    });
+  }
+
+  async function loadResult() {
+    const params = new URLSearchParams(window.location.search);
+    const scanId = params.get("id");
+
+    let data;
+
+    // Try cached result first
+    const cached = localStorage.getItem("sb_last_result");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.scan_id === scanId) { data = parsed; localStorage.removeItem("sb_last_result"); }
+      } catch{}
+    }
+
+    // Fetch from API if not cached
+    if (!data && scanId) {
+      try {
+        const res = await fetch(`${API}/scans/${scanId}`, {headers:{"Authorization":`Bearer ${token}`}});
+        const json = await res.json();
+        if (res.ok) data = json.result;
+      } catch{}
+    }
+
+    document.getElementById("loadingState").hidden = true;
+
+    if (!data) {
+      document.getElementById("resultsContent").hidden = false;
+      document.getElementById("verdict").textContent = "Could not load result. Please go back and run a new analysis.";
+      return;
+    }
+
+    document.getElementById("resultsContent").hidden = false;
+    document.getElementById("pageTitle").textContent = `Results — ${data.job_role||""}`;
+    document.getElementById("verdict").textContent = data.one_line_verdict || "Analysis complete.";
+
+    renderATS(data);
+    renderMistakes(data);
+    renderImprove(data);
+    renderJD(data);
+    renderCareers(data);
+    renderInterview(data);
+  }
+
+  loadResult();
+</script>
+</body>
+</html>

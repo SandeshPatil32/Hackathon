@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge AI — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root { --amber:#f59e0b; --teal:#14b8a6; --ink:#080c18; }
+    body  { font-family:'DM Sans',sans-serif; background:#080c18; color:#e8eaf0; min-height:100vh; }
+    h1,h2,h3,.syne { font-family:'Syne',sans-serif; }
+
+    .sidebar {
+      width: 260px; min-height: 100vh;
+      background: rgba(255,255,255,0.03);
+      border-right: 1px solid rgba(255,255,255,0.07);
+      position: fixed; left:0; top:0; bottom:0;
+      display: flex; flex-direction: column;
+      padding: 28px 20px;
+      z-index: 50;
+    }
+    .nav-item {
+      display:flex; align-items:center; gap:12px;
+      padding:11px 14px; border-radius:12px;
+      color:rgba(255,255,255,0.45); font-size:0.88rem; font-weight:500;
+      cursor:pointer; transition:all 0.2s; text-decoration:none;
+    }
+    .nav-item:hover  { background:rgba(255,255,255,0.06); color:#e8eaf0; }
+    .nav-item.active { background:rgba(245,158,11,0.12); color:#f59e0b; }
+    .nav-icon { font-size:1.1rem; width:22px; text-align:center; }
+
+    .main { margin-left:260px; padding:32px 36px; }
+
+    .stat-card {
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:18px; padding:24px;
+      transition: border-color 0.3s;
+    }
+    .stat-card:hover { border-color:rgba(245,158,11,0.3); }
+
+    .glass { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07); border-radius:18px; }
+
+    .score-ring-wrap { position:relative; width:80px;height:80px; }
+    .score-ring { width:80px;height:80px; transform:rotate(-90deg); }
+    .ring-bg   { fill:none; stroke:rgba(255,255,255,0.06); stroke-width:8; }
+    .ring-fill { fill:none; stroke:#f59e0b; stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1); }
+    .score-num { position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800; }
+
+    .badge { display:inline-block;padding:3px 10px;border-radius:100px;font-size:0.72rem;font-weight:600;font-family:'Syne',sans-serif; }
+    .badge-high   { background:rgba(52,211,153,0.15);color:#34d399; }
+    .badge-medium { background:rgba(245,158,11,0.15);color:#f59e0b; }
+    .badge-low    { background:rgba(239,68,68,0.15);color:#f87171; }
+
+    .btn-primary {
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      border:none; border-radius:12px; color:#0a0e1a;
+      font-family:'Syne',sans-serif; font-weight:700; font-size:0.88rem;
+      padding:11px 22px; cursor:pointer; transition:all 0.3s;
+      box-shadow:0 4px 16px rgba(245,158,11,0.25);
+    }
+    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(245,158,11,0.4); }
+
+    .scan-row {
+      display:flex; align-items:center; gap:16px;
+      padding:14px 18px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.06);
+      background:rgba(255,255,255,0.03);
+      transition:all 0.2s; cursor:pointer;
+    }
+    .scan-row:hover { background:rgba(255,255,255,0.06); border-color:rgba(245,158,11,0.25); }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .fu { animation:fadeUp 0.5s ease both; }
+    .fu-1{animation-delay:.05s}.fu-2{animation-delay:.1s}.fu-3{animation-delay:.15s}.fu-4{animation-delay:.2s}
+
+    [hidden]{display:none!important}
+
+    @media(max-width:768px){
+      .sidebar{display:none}
+      .main{margin-left:0;padding:20px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="flex items-center gap-3 mb-10">
+    <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black">S</div>
+    <span class="text-white font-bold text-lg syne">Skill<span style="color:#f59e0b">Bridge</span></span>
+  </div>
+
+  <nav class="flex-1 space-y-1">
+    <a href="dashboard.html" class="nav-item active"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="analyzer.html"  class="nav-item"><span class="nav-icon">🧠</span> Analyze Resume</a>
+    <a href="history.html"   class="nav-item"><span class="nav-icon">📋</span> Scan History</a>
+  </nav>
+
+  <div class="mt-auto space-y-2">
+    <div class="nav-item" style="color:rgba(255,255,255,0.3);cursor:default;font-size:0.78rem;" id="sidebarUser"></div>
+    <button onclick="logout()" class="nav-item w-full text-left" style="color:#f87171;">
+      <span class="nav-icon">⬡</span> Sign Out
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8 fu">
+    <div>
+      <h1 class="text-2xl font-black text-white syne" id="welcomeMsg">Welcome back 👋</h1>
+      <p class="text-white/40 text-sm mt-1">Here's your career intelligence overview</p>
+    </div>
+    <a href="analyzer.html" class="btn-primary">+ Analyze Resume</a>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <div class="stat-card fu fu-1">
+      <div class="text-white/40 text-xs uppercase tracking-widest mb-3">Total Scans</div>
+      <div class="text-3xl font-black text-white syne" id="statScans">—</div>
+      <div class="text-xs text-white/30 mt-1">resumes analyzed</div>
+    </div>
+    <div class="stat-card fu fu-2">
+      <div class="text-white/40 text-xs uppercase tracking-widest mb-3">Avg ATS Score</div>
+      <div class="text-3xl font-black syne" style="color:#f59e0b" id="statAvg">—</div>
+      <div class="text-xs text-white/30 mt-1">across all scans</div>
+    </div>
+    <div class="stat-card fu fu-3">
+      <div class="text-white/40 text-xs uppercase tracking-widest mb-3">Best Score</div>
+      <div class="text-3xl font-black text-white syne" id="statBest">—</div>
+      <div class="text-xs text-white/30 mt-1">highest ATS score</div>
+    </div>
+    <div class="stat-card fu fu-4">
+      <div class="text-white/40 text-xs uppercase tracking-widest mb-3">Roles Explored</div>
+      <div class="text-3xl font-black syne" style="color:#14b8a6" id="statRoles">—</div>
+      <div class="text-xs text-white/30 mt-1">unique job roles</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+
+    <!-- ATS Trend -->
+    <div class="glass p-6 lg:col-span-2 fu">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="font-bold text-white syne text-sm uppercase tracking-wider">ATS Score Trend</h3>
+        <span class="text-xs text-white/30">Last 7 scans</span>
+      </div>
+      <canvas id="trendChart" height="90"></canvas>
+      <div class="text-center text-white/20 text-sm mt-4" id="trendEmpty" hidden>No scan data yet — analyze your first resume!</div>
+    </div>
+
+    <!-- Role Distribution -->
+    <div class="glass p-6 fu">
+      <h3 class="font-bold text-white syne text-sm uppercase tracking-wider mb-5">Roles Explored</h3>
+      <canvas id="roleChart" height="160"></canvas>
+      <div class="text-center text-white/20 text-sm mt-4" id="roleEmpty" hidden>No data yet</div>
+    </div>
+
+  </div>
+
+  <!-- Recent Scans -->
+  <div class="glass p-6 fu">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-bold text-white syne text-sm uppercase tracking-wider">Recent Scans</h3>
+      <a href="history.html" class="text-xs text-amber-400 hover:text-amber-300">View all →</a>
+    </div>
+    <div id="recentList" class="space-y-3">
+      <div class="text-center text-white/20 py-8" id="recentEmpty">No scans yet. <a href="analyzer.html" class="text-amber-400">Analyze your first resume →</a></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const API   = "http://localhost:5000/api";
+  const token = localStorage.getItem("sb_token");
+  if (!token) window.location.href = "auth.html";
+
+  const authHeaders = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = "auth.html";
+  }
+
+  function atsColor(s) {
+    if (s >= 75) return "#34d399";
+    if (s >= 50) return "#f59e0b";
+    return "#f87171";
+  }
+
+  function timeAgo(iso) {
+    const diff = Date.now() - new Date(iso);
+    const m = Math.floor(diff/60000);
+    if (m < 1)   return "just now";
+    if (m < 60)  return `${m}m ago`;
+    if (m < 1440)return `${Math.floor(m/60)}h ago`;
+    return `${Math.floor(m/1440)}d ago`;
+  }
+
+  async function loadDashboard() {
+    try {
+      const res  = await fetch(`${API}/dashboard`, { headers: authHeaders });
+      const data = await res.json();
+      if (!res.ok) { if (res.status === 401) logout(); return; }
+
+      // Welcome
+      const name = localStorage.getItem("sb_name") || data.user?.name || "there";
+      document.getElementById("welcomeMsg").textContent = `Welcome back, ${name.split(" ")[0]} 👋`;
+      document.getElementById("sidebarUser").textContent = localStorage.getItem("sb_email") || "";
+
+      // Stats
+      const scans  = data.recent_scans || [];
+      const scores = scans.map(s => s.ats_score);
+      document.getElementById("statScans").textContent = data.total_scans  || 0;
+      document.getElementById("statAvg").textContent   = data.avg_ats      || 0;
+      document.getElementById("statBest").textContent  = scores.length ? Math.max(...scores) : "—";
+      document.getElementById("statRoles").textContent = (data.role_distribution || []).length;
+
+      // Trend Chart
+      const trend = data.ats_trend || [];
+      if (trend.length > 0) {
+        new Chart(document.getElementById("trendChart"), {
+          type: "line",
+          data: {
+            labels: trend.map(t => t.role.length > 12 ? t.role.slice(0,12)+"…" : t.role),
+            datasets: [{
+              data: trend.map(t => t.score),
+              borderColor: "#f59e0b",
+              backgroundColor: "rgba(245,158,11,0.08)",
+              tension: 0.4, fill: true,
+              pointBackgroundColor: trend.map(t => atsColor(t.score)),
+              pointRadius: 5, borderWidth: 2
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color:"rgba(255,255,255,0.3)", font:{size:11} }, grid:{color:"rgba(255,255,255,0.04)"} },
+              y: { min:0, max:100, ticks: { color:"rgba(255,255,255,0.3)", font:{size:11} }, grid:{color:"rgba(255,255,255,0.04)"} }
+            }
+          }
+        });
+      } else {
+        document.getElementById("trendChart").hidden = true;
+        document.getElementById("trendEmpty").hidden = false;
+      }
+
+      // Role chart
+      const roles = data.role_distribution || [];
+      if (roles.length > 0) {
+        new Chart(document.getElementById("roleChart"), {
+          type: "doughnut",
+          data: {
+            labels: roles.map(r => r.role),
+            datasets: [{ data: roles.map(r => r.count), backgroundColor: ["#f59e0b","#14b8a6","#818cf8","#f472b6","#34d399"], borderWidth:0 }]
+          },
+          options: {
+            plugins: { legend: { labels: { color:"rgba(255,255,255,0.4)", font:{size:11}, boxWidth:10 } } },
+            cutout: "65%"
+          }
+        });
+      } else {
+        document.getElementById("roleChart").hidden = true;
+        document.getElementById("roleEmpty").hidden = false;
+      }
+
+      // Recent scans list
+      if (scans.length > 0) {
+        document.getElementById("recentEmpty").remove();
+        const list = document.getElementById("recentList");
+        scans.forEach(s => {
+          const c = atsColor(s.ats_score);
+          const div = document.createElement("div");
+          div.className = "scan-row";
+          div.innerHTML = `
+            <div class="score-ring-wrap">
+              <svg class="score-ring" viewBox="0 0 80 80">
+                <circle class="ring-bg" cx="40" cy="40" r="32"/>
+                <circle class="ring-fill" cx="40" cy="40" r="32"
+                  stroke="${c}"
+                  stroke-dasharray="201"
+                  stroke-dashoffset="${201 - (s.ats_score/100)*201}"/>
+              </svg>
+              <div class="score-num" style="color:${c};font-size:0.85rem;">${s.ats_score}</div>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-white text-sm">${s.job_role}</div>
+              <div class="text-xs text-white/35 mt-0.5">${timeAgo(s.scanned_at)}</div>
+            </div>
+            <div class="text-xs" style="color:${c}">ATS ${s.ats_score}%</div>
+            <div class="text-white/30 text-xs">→</div>`;
+          div.onclick = () => window.location.href = `result.html?id=${s._id}`;
+          list.appendChild(div);
+        });
+      }
+
+    } catch(err) {
+      console.error(err);
+    }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge AI — Scan History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    body{font-family:'DM Sans',sans-serif;background:#080c18;color:#e8eaf0;min-height:100vh;}
+    .syne{font-family:'Syne',sans-serif;}
+    .sidebar{width:260px;min-height:100vh;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.07);position:fixed;left:0;top:0;bottom:0;display:flex;flex-direction:column;padding:28px 20px;z-index:50;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;color:rgba(255,255,255,0.45);font-size:0.88rem;font-weight:500;cursor:pointer;transition:all 0.2s;text-decoration:none;}
+    .nav-item:hover{background:rgba(255,255,255,0.06);color:#e8eaf0;}
+    .nav-item.active{background:rgba(245,158,11,0.12);color:#f59e0b;}
+    .main{margin-left:260px;padding:32px 36px;}
+    .glass{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:18px;}
+    .scan-card{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:20px;padding:18px 22px;border-radius:14px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.03);transition:all 0.2s;cursor:pointer;}
+    .scan-card:hover{border-color:rgba(245,158,11,0.3);background:rgba(255,255,255,0.06);}
+    .ring-wrap{position:relative;width:54px;height:54px;}
+    .mini-ring{width:54px;height:54px;transform:rotate(-90deg);}
+    .ring-bg{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:6;}
+    .ring-fill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 1s ease;}
+    .ring-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:0.82rem;}
+    @media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:16px}.scan-card{grid-template-columns:52px 1fr auto;}}
+  </style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="flex items-center gap-3 mb-10">
+    <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-gray-900 font-black">S</div>
+    <span class="text-white font-bold text-lg syne">Skill<span style="color:#f59e0b">Bridge</span></span>
+  </div>
+  <nav class="flex-1 space-y-1">
+    <a href="dashboard.html" class="nav-item"><span style="width:22px;text-align:center">📊</span> Dashboard</a>
+    <a href="analyzer.html"  class="nav-item"><span style="width:22px;text-align:center">🧠</span> Analyze Resume</a>
+    <a href="history.html"   class="nav-item active"><span style="width:22px;text-align:center">📋</span> Scan History</a>
+  </nav>
+  <div class="mt-auto">
+    <button onclick="localStorage.clear();window.location.href='auth.html'" class="nav-item w-full text-left" style="color:#f87171;">
+      <span style="width:22px;text-align:center">⬡</span> Sign Out
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-black text-white syne">Scan History</h1>
+      <p class="text-white/40 text-sm mt-1">All your resume analyses in one place</p>
+    </div>
+    <a href="analyzer.html" class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl transition-all">+ New Scan</a>
+  </div>
+
+  <div id="loadingState" class="text-center py-20">
+    <div class="w-10 h-10 border-2 border-white/10 border-t-amber-400 rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-white/40">Loading history…</p>
+  </div>
+
+  <div id="emptyState" class="glass p-16 text-center" hidden>
+    <div class="text-5xl mb-4">📋</div>
+    <h3 class="text-xl font-black text-white syne mb-2">No Scans Yet</h3>
+    <p class="text-white/40 mb-6">Analyze your first resume to see results here.</p>
+    <a href="analyzer.html" class="bg-amber-500 text-gray-900 font-bold px-6 py-3 rounded-xl">Analyze Resume →</a>
+  </div>
+
+  <div id="historyList" class="space-y-3" hidden></div>
+</main>
+
+<script>
+  const API=  "http://localhost:5000/api";
+  const token=localStorage.getItem("sb_token");
+  if(!token)window.location.href="auth.html";
+
+  function atsColor(s){if(s>=75)return"#34d399";if(s>=50)return"#f59e0b";return"#f87171";}
+  function timeAgo(iso){
+    const d=Math.floor((Date.now()-new Date(iso))/86400000);
+    if(d===0)return"Today";if(d===1)return"Yesterday";if(d<7)return`${d}d ago`;if(d<30)return`${Math.floor(d/7)}w ago`;return`${Math.floor(d/30)}mo ago`;
+  }
+
+  async function loadHistory(){
+    try{
+      const res=await fetch(`${API}/dashboard`,{headers:{"Authorization":`Bearer ${token}`}});
+      const data=await res.json();
+      if(!res.ok){if(res.status===401)localStorage.clear(),window.location.href="auth.html";return;}
+
+      document.getElementById("loadingState").hidden=true;
+      const scans=data.recent_scans||[];
+      if(!scans.length){document.getElementById("emptyState").hidden=false;return;}
+
+      document.getElementById("historyList").hidden=false;
+      const list=document.getElementById("historyList");
+
+      scans.forEach(s=>{
+        const c=atsColor(s.ats_score);
+        const circ=2*Math.PI*22; // r=22
+        const offset=circ-(s.ats_score/100)*circ;
+        const div=document.createElement("div");
+        div.className="scan-card";
+        div.innerHTML=`
+          <div class="ring-wrap">
+            <svg class="mini-ring" viewBox="0 0 54 54">
+              <circle class="ring-bg" cx="27" cy="27" r="22"/>
+              <circle class="ring-fill" cx="27" cy="27" r="22"
+                stroke="${c}" stroke-dasharray="${circ.toFixed(0)}" stroke-dashoffset="${circ.toFixed(0)}"/>
+            </svg>
+            <div class="ring-num" style="color:${c}">${s.ats_score}</div>
+          </div>
+          <div>
+            <div class="font-semibold text-white">${s.job_role}</div>
+            <div class="text-xs text-white/35 mt-1">${timeAgo(s.scanned_at)} · ATS ${s.ats_score}% · JD Match ${s.jd_match||"N/A"}%</div>
+          </div>
+          <div class="text-white/25 text-sm">View →</div>`;
+        div.onclick=()=>window.location.href=`result.html?id=${s._id}`;
+        list.appendChild(div);
+
+        // Animate ring after mount
+        setTimeout(()=>{
+          const fill=div.querySelector(".ring-fill");
+          if(fill)fill.style.strokeDashoffset=offset;
+        },100);
+      });
+    }catch(err){console.error(err);}
+  }
+  loadHistory();
+</script>
+</body>
+</html>
