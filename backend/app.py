@@ -1,18 +1,15 @@
 """
 SkillBridge AI v4 — Full Stack Backend
 =======================================
-Features:
-  - JWT Auth (register/login/logout) with MongoDB
-  - Resume upload + PDF text extraction
-  - ATS Score generator
-  - Mistake detector
-  - Job Description matcher
-  - AI Career recommendations   
-  - Dashboard analytics (per user)
-  - All endpoints protected by JWT
+Complete working version with stable google-generativeai SDK
 """
 
-import os, json, re, io, datetime
+import os
+import json
+import re
+import io
+import datetime
+import time
 import pdfplumber
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -21,12 +18,10 @@ from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity
 )
-import os, json, re, io, datetime, time
 from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv
-from google import genai
-import time
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -34,64 +29,73 @@ load_dotenv()
 #  App Init
 # ─────────────────────────────────────────────
 app = Flask(__name__)
-app.config["JWT_SECRET_KEY"]        = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(hours=24)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}},
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"])
 
-bcrypt  = Bcrypt(app)
-jwt     = JWTManager(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
 # ─────────────────────────────────────────────
 #  MongoDB
 # ─────────────────────────────────────────────
-MONGO_URI = os.getenv("MONGO_URI")
-mongo     = MongoClient(MONGO_URI)
-db        = mongo["skillbridge"]
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/skillbridge")
+mongo = MongoClient(MONGO_URI)
+db = mongo["skillbridge"]
 users_col = db["users"]
 scans_col = db["scans"]
 
 # ─────────────────────────────────────────────
-#  Gemini
+#  Gemini Configuration (Stable SDK)
 # ─────────────────────────────────────────────
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "YOUR_KEY_HERE"))
-MODEL  = "gemini-1.5-flash"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_KEY_HERE")
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
+
 
 def call_gemini(prompt: str) -> str:
-    time.sleep(3)
-    response = client.models.generate_content(model=MODEL, contents=prompt)
+    """Call Gemini with rate limiting"""
+    time.sleep(3)  # Prevent hitting rate limits
+    response = model.generate_content(prompt)
     return response.text
 
+
 def extract_json(raw: str) -> dict:
+    """Extract JSON from Gemini response"""
     cleaned = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
-    s = cleaned.find("{"); e = cleaned.rfind("}") + 1
+    s = cleaned.find("{")
+    e = cleaned.rfind("}") + 1
     if s == -1 or e == 0:
         raise ValueError("No JSON in response")
     return json.loads(cleaned[s:e])
 
+
 # ─────────────────────────────────────────────
-#  CORS preflight
+#  CORS Preflight
 # ─────────────────────────────────────────────
 @app.before_request
 def handle_options():
     if request.method == "OPTIONS":
         r = jsonify({"ok": True})
         r.headers.update({
-            "Access-Control-Allow-Origin":  "*",
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
         })
         return r, 200
 
+
 # ─────────────────────────────────────────────
-#  Helper — serialize ObjectId
+#  Helper
 # ─────────────────────────────────────────────
 def serialize(doc):
     if doc and "_id" in doc:
         doc["_id"] = str(doc["_id"])
     return doc
+
 
 # ═════════════════════════════════════════════
 #  AUTH ROUTES
@@ -102,9 +106,9 @@ def register():
     """POST { name, email, password }"""
     try:
         d = request.get_json(force=True, silent=True) or {}
-        name     = d.get("name","").strip()
-        email    = d.get("email","").strip().lower()
-        password = d.get("password","")
+        name = d.get("name", "").strip()
+        email = d.get("email", "").strip().lower()
+        password = d.get("password", "")
 
         if not all([name, email, password]):
             return jsonify({"error": "Name, email and password are required."}), 400
@@ -115,9 +119,9 @@ def register():
 
         hashed = bcrypt.generate_password_hash(password).decode("utf-8")
         user_id = users_col.insert_one({
-            "name":       name,
-            "email":      email,
-            "password":   hashed,
+            "name": name,
+            "email": email,
+            "password": hashed,
             "created_at": datetime.datetime.utcnow(),
             "total_scans": 0,
             "avg_ats_score": 0
@@ -135,8 +139,8 @@ def login():
     """POST { email, password }"""
     try:
         d = request.get_json(force=True, silent=True) or {}
-        email    = d.get("email","").strip().lower()
-        password = d.get("password","")
+        email = d.get("email", "").strip().lower()
+        password = d.get("password", "")
 
         if not email or not password:
             return jsonify({"error": "Email and password are required."}), 400
@@ -148,7 +152,7 @@ def login():
         token = create_access_token(identity=str(user["_id"]))
         return jsonify({
             "token": token,
-            "name":  user["name"],
+            "name": user["name"],
             "email": user["email"]
         }), 200
 
@@ -161,11 +165,12 @@ def login():
 def me():
     """GET current user profile"""
     try:
-        uid  = get_jwt_identity()
+        uid = get_jwt_identity()
         user = users_col.find_one({"_id": ObjectId(uid)}, {"password": 0})
         return jsonify(serialize(user)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # ═════════════════════════════════════════════
 #  PDF EXTRACTION
@@ -190,7 +195,8 @@ def extract_pdf():
         with pdfplumber.open(io.BytesIO(raw)) as pdf:
             for page in pdf.pages:
                 t = page.extract_text()
-                if t: pages.append(t.strip())
+                if t:
+                    pages.append(t.strip())
 
         text = "\n\n".join(pages).strip()
         if len(text) < 30:
@@ -200,8 +206,9 @@ def extract_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # ═════════════════════════════════════════════
-#  CORE ANALYSIS ENGINE
+#  PROMPTS
 # ═════════════════════════════════════════════
 
 def build_full_analysis_prompt(resume: str, job_role: str, jd: str = "") -> str:
@@ -219,25 +226,26 @@ Return this exact JSON:
 {{
   "ats_score": <integer 0-100>,
   "ats_breakdown": {{
-    "keyword_match":      <0-100>,
+    "keyword_match": <0-100>,
     "format_compatibility": <0-100>,
     "section_completeness": <0-100>,
-    "quantified_impact":  <0-100>,
-    "readability":        <0-100>
+    "quantified_impact": <0-100>,
+    "readability": <0-100>
   }},
   "resume_mistakes": [
-    {{"type": "critical|warning|suggestion", "issue": "Describe the problem", "fix": "How to fix it"}},
-    {{"type": "critical|warning|suggestion", "issue": "...", "fix": "..."}}
+    {{"type": "critical", "issue": "Describe the problem", "fix": "How to fix it"}},
+    {{"type": "warning", "issue": "...", "fix": "..."}},
+    {{"type": "suggestion", "issue": "...", "fix": "..."}}
   ],
   "improvement_suggestions": {{
-    "add_these":    ["concrete item to add", "another item"],
+    "add_these": ["concrete item to add", "another item"],
     "remove_these": ["item to remove"],
     "rewrite_these": ["phrase → better version"]
   }},
   "jd_match": {{
     "match_percentage": <0-100>,
-    "matched_keywords":  ["kw1", "kw2"],
-    "missing_keywords":  ["kw1", "kw2"],
+    "matched_keywords": ["kw1", "kw2"],
+    "missing_keywords": ["kw1", "kw2"],
     "gap_summary": "One paragraph summary of the gap"
   }},
   "career_recommendations": [
@@ -250,19 +258,23 @@ Return this exact JSON:
       "search": "exact search phrase"
     }}
   ],
-  "existing_skills":      ["skill1", "skill2"],
-  "missing_skills":       ["skill1", "skill2"],
-  "interview_questions":  [
-    {{"category": "Technical",   "question": "Q?", "tip": "Tip"}},
-    {{"category": "Behavioral",  "question": "Q?", "tip": "Tip"}},
+  "existing_skills": ["skill1", "skill2"],
+  "missing_skills": ["skill1", "skill2"],
+  "interview_questions": [
+    {{"category": "Technical", "question": "Q?", "tip": "Tip"}},
+    {{"category": "Behavioral", "question": "Q?", "tip": "Tip"}},
     {{"category": "Situational", "question": "Q?", "tip": "Tip"}},
-    {{"category": "Technical",   "question": "Q?", "tip": "Tip"}},
+    {{"category": "Technical", "question": "Q?", "tip": "Tip"}},
     {{"category": "Culture Fit", "question": "Q?", "tip": "Tip"}}
   ],
   "strengths": ["strength 1", "strength 2", "strength 3"],
-  "one_line_verdict": "One sentence overall assessment of this resume"
+  "one_line_verdict": "One sentence overall assessment"
 }}"""
 
+
+# ═════════════════════════════════════════════
+#  ANALYSIS ROUTE
+# ═════════════════════════════════════════════
 
 @app.route("/api/analyze", methods=["POST"])
 @jwt_required()
@@ -273,16 +285,19 @@ def analyze():
     """
     try:
         uid = get_jwt_identity()
-        d   = request.get_json(force=True, silent=True) or {}
-        resume   = d.get("resume",   "").strip()
+        d = request.get_json(force=True, silent=True) or {}
+        resume = d.get("resume", "").strip()
         job_role = d.get("job_role", "").strip()
-        jd       = d.get("job_description", "").strip()
+        jd = d.get("job_description", "").strip()
 
-        if not resume:   return jsonify({"error": "Resume text required."}), 400
-        if not job_role: return jsonify({"error": "Job role required."}), 400
-        if len(resume) < 50: return jsonify({"error": "Resume too short."}), 400
+        if not resume:
+            return jsonify({"error": "Resume text required."}), 400
+        if not job_role:
+            return jsonify({"error": "Job role required."}), 400
+        if len(resume) < 50:
+            return jsonify({"error": "Resume too short."}), 400
 
-        raw    = call_gemini(build_full_analysis_prompt(resume, job_role, jd))
+        raw = call_gemini(build_full_analysis_prompt(resume, job_role, jd))
         result = extract_json(raw)
 
         # Clamp scores
@@ -294,12 +309,12 @@ def analyze():
 
         # Save scan to MongoDB
         scan_doc = {
-            "user_id":   uid,
-            "job_role":  job_role,
+            "user_id": uid,
+            "job_role": job_role,
             "ats_score": result["ats_score"],
-            "jd_match":  result.get("jd_match", {}).get("match_percentage", 0),
+            "jd_match": result.get("jd_match", {}).get("match_percentage", 0),
             "scanned_at": datetime.datetime.utcnow(),
-            "result":    result
+            "result": result
         }
         scan_id = scans_col.insert_one(scan_doc).inserted_id
 
@@ -319,6 +334,7 @@ def analyze():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # ═════════════════════════════════════════════
 #  DASHBOARD ANALYTICS
 # ═════════════════════════════════════════════
@@ -328,20 +344,20 @@ def analyze():
 def dashboard():
     """GET — returns user's scan history and analytics"""
     try:
-        uid  = get_jwt_identity()
+        uid = get_jwt_identity()
         user = users_col.find_one({"_id": ObjectId(uid)}, {"password": 0})
 
         # Last 10 scans
         scans = list(scans_col.find(
             {"user_id": uid},
-            {"result": 0}           # exclude heavy result object
+            {"result": 0}
         ).sort("scanned_at", -1).limit(10))
 
         for s in scans:
-            s["_id"]        = str(s["_id"])
+            s["_id"] = str(s["_id"])
             s["scanned_at"] = s["scanned_at"].isoformat()
 
-        # ATS score trend (last 7)
+        # ATS score trend
         trend = [{"role": s["job_role"], "score": s["ats_score"], "date": s["scanned_at"]} for s in scans[:7]]
 
         # Role distribution
@@ -350,11 +366,11 @@ def dashboard():
             roles[s["job_role"]] = roles.get(s["job_role"], 0) + 1
 
         return jsonify({
-            "user":        serialize(user),
+            "user": serialize(user),
             "total_scans": user.get("total_scans", 0),
-            "avg_ats":     user.get("avg_ats_score", 0),
+            "avg_ats": user.get("avg_ats_score", 0),
             "recent_scans": scans,
-            "ats_trend":   trend,
+            "ats_trend": trend,
             "role_distribution": [{"role": k, "count": v} for k, v in roles.items()]
         }), 200
 
@@ -367,15 +383,16 @@ def dashboard():
 def get_scan(scan_id):
     """GET a specific scan result"""
     try:
-        uid  = get_jwt_identity()
+        uid = get_jwt_identity()
         scan = scans_col.find_one({"_id": ObjectId(scan_id), "user_id": uid})
         if not scan:
             return jsonify({"error": "Scan not found."}), 404
-        scan["_id"]        = str(scan["_id"])
+        scan["_id"] = str(scan["_id"])
         scan["scanned_at"] = scan["scanned_at"].isoformat()
         return jsonify(scan), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # ═════════════════════════════════════════════
 #  HEALTH
@@ -384,11 +401,16 @@ def get_scan(scan_id):
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({
-        "status":  "ok",
+        "status": "ok",
         "service": "SkillBridge AI v4",
-        "db":      "MongoDB connected" if mongo else "disconnected"
+        "db": "MongoDB connected" if mongo else "disconnected"
     }), 200
 
 
 if __name__ == "__main__":
+    print("=" * 60)
+    print("SkillBridge AI Backend Starting...")
+    print(f"MongoDB: {MONGO_URI}")
+    print(f"Gemini Model: gemini-1.5-flash")
+    print("=" * 60)
     app.run(debug=True, host="0.0.0.0", port=5000)
